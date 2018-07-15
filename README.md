@@ -13,6 +13,7 @@ Since we are starting a new project which *will not be compatible with node-resq
 * "multiworker" by default
 * better "worker is dead" vs "worker is working" apis
 * append job status to the job, including errors
+* job history (via hyperdrive versions)
 
 Based on:
 * Hyperdiscovery - https://github.com/karissa/hyperdiscovery
