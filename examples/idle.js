@@ -12,6 +12,7 @@ const hyperjob = new Hyperjob({
 })
 
 hyperjob.on('ready', (version) => { console.log(`Ready! (version: ${version})`) })
+hyperjob.on('connecting', () => { console.log(`connecting to swarm...`) })
 hyperjob.on('error', (error) => { console.error(`Error: ${error}`) })
 hyperjob.on('archiveKey', (key) => { console.log(`Archive Key: ${key}`) })
 hyperjob.on('peerConnect', (peer, type) => { console.log(`Peer Connected: ${type.host}:${type.port} (${type.type})`) })

@@ -1,92 +1,53 @@
 const { EventEmitter } = require('events')
-const hyperdrive = require('hyperdrive')
+const hyperdb = require('hyperdb')
 const swarm = require('hyperdiscovery')
 const uuid = require('uuid')
+const path = require('path')
+const dbAsyncify = require(path.join(__dirname, 'utils', 'dbAsyncify.js'))
 
 module.exports = class Hyperjob extends EventEmitter {
   constructor (options) {
     super()
 
-    if (!options) { throw new Error('options.archiveKey and options.archivePath required') }
+    if (!options) { throw new Error('options.archivePath is required and you may want to provide options.archiveKey') }
 
-    this.archiveKey = options.archiveKey
-    // if (!this.archiveKey) { throw new Error('options.archiveKey required') }
+    this.databaseKey = options.archiveKey
+    if (this.databaseKey) { this.databaseKey = Buffer.from(this.databaseKey, 'hex') }
 
-    this.archivePath = options.archivePath
-    if (!this.archivePath) { throw new Error('options.archivePath required') }
+    this.databasePath = options.archivePath
+    if (!this.databasePath) { throw new Error('options.archivePath required') }
 
     this.connections = {}
   }
 
   async connect () {
-    await new Promise((resolve, reject) => {
-      this.archive = hyperdrive(this.archivePath, this.archiveKey)
-      this.archive.on('error', (error) => { this.emit('error', error) })
-      this.archive.on('ready', (error) => {
-        if (error) { return reject(error) }
-        this.emit('ready', this.archive.version)
-        this.emit('archiveKey', this.archive.key.toString('hex'))
+    const dbOptions = {valueEncoding: 'utf-8'}
 
-        this.swarm = swarm(this.archive)
+    await new Promise(async (resolve, reject) => {
+      this.database = hyperdb(this.databasePath, this.databaseKey, dbOptions)
+      dbAsyncify(this.database)
+
+      this.database.on('error', (error) => { this.emit('error', error) })
+      this.database.on('ready', async (error) => {
+        if (error) { return reject(error) }
+
+        this.emit('archiveKey', this.database.key.toString('hex'))
+
+        this.swarm = swarm(this.database)
         this.swarm.on('error', (error) => { this.emit('error', error) })
         this.swarm.on('connection', (peer, type) => { this.handleConnection(peer, type) })
+        this.emit('connecting')
+
+        let version = await this.database.versionAsync()
+        this.emit('ready', version)
 
         return resolve()
       })
     })
-
-    this.buildAsyncMethods()
   }
 
   async close () {
     await this.swarm.close()
-  }
-
-  buildAsyncMethods () {
-    this.archive.writeFileAsync = async (path, contents) => {
-      return new Promise((resolve, reject) => {
-        this.archive.writeFile(path, contents, (error) => {
-          if (error) { return reject(error) }
-          return resolve()
-        })
-      })
-    }
-
-    this.archive.readFileAsync = async (path, encoding = 'utf-8') => {
-      return new Promise((resolve, reject) => {
-        this.archive.readFile(path, encoding, (error, data) => {
-          if (error) { return reject(error) }
-          return resolve(data)
-        })
-      })
-    }
-
-    this.archive.readdirAsync = async (path) => {
-      return new Promise((resolve, reject) => {
-        this.archive.readdir(path, (error, data) => {
-          if (error) { return reject(error) }
-          return resolve(data)
-        })
-      })
-    }
-
-    this.archive.unlinkAsync = async (path) => {
-      return new Promise((resolve, reject) => {
-        this.archive.unlink(path, (error, data) => {
-          if (error) { return reject(error) }
-          return resolve(data)
-        })
-      })
-    }
-
-    this.archive.rmdirAsync = async (path) => {
-      return new Promise((resolve, reject) => {
-        this.archive.rmdir(path, (error, data) => {
-          if (error) { return reject(error) }
-          return resolve(data)
-        })
-      })
-    }
   }
 
   handleConnection (peer, type) {
@@ -100,65 +61,76 @@ module.exports = class Hyperjob extends EventEmitter {
 
   async enqueue (queue, method, args, name = uuid.v4()) {
     name = this.sanitize(name)
+    queue = this.sanitize(queue)
     const path = `/queues/${queue}/${name}.job`
     const contents = { method, args, enqueuedAt: new Date().getTime() }
-    return this.archive.writeFileAsync(path, JSON.stringify(contents))
+    return this.database.putAsync(path, JSON.stringify(contents))
   }
 
   async queues () {
-    return this.archive.readdirAsync('/queues')
+    const nodes = await this.database.listAsync('/queues')
+    let queues = []
+    nodes.forEach((node) => {
+      let queue = node.key.match(/^queues\/(\w+)\/.*$/)[1]
+      if (!queues.includes(queue)) { queues.push(queue) }
+    })
+
+    queues.sort()
+    return queues
   }
 
   async enqueued (queue, start = 0, stop = undefined) {
+    queue = this.sanitize(queue)
     const path = `/queues/${queue}`
-    let files
-    try {
-      files = await this.archive.readdirAsync(path)
-    } catch (error) {
-      if (error.toString().indexOf(`/queues/${queue} could not be found`) >= 0) { return [] }
-      throw error
-    }
-
-    const slicedFiles = files.slice(start, stop)
-    return slicedFiles.map((filename) => {
-      return filename.split('.').slice(0, -1).join('.')
+    const nodes = await this.database.listAsync(path)
+    const slicedNodes = nodes.slice(start, stop)
+    const matcher = new RegExp(`^queues/${queue}/(.*).job$`)
+    return slicedNodes.map((node) => {
+      return node.key.match(matcher)[1]
     })
   }
 
   async get (queue, name, type = 'queues') {
     name = this.sanitize(name)
+    queue = this.sanitize(queue)
     const path = `/${type}/${queue}/${name}.job`
-    const stringifiedData = await this.archive.readFileAsync(path)
-    return JSON.parse(stringifiedData)
+    const node = await this.database.getAsync(path)
+    return JSON.parse(node.value)
   }
 
   async del (queue, name, type = 'queues') {
     name = this.sanitize(name)
+    queue = this.sanitize(queue)
     const path = `/${type}/${queue}/${name}.job`
-    return this.archive.unlinkAsync(path)
+    return this.database.delAsync(path)
   }
 
   async length (queue) {
+    queue = this.sanitize(queue)
     const files = await this.enqueued(queue)
     return files.length
   }
 
   async delQueue (queue) {
+    queue = this.sanitize(queue)
     const files = await this.enqueued(queue)
-    for (let i in files) { await this.archive.unlinkAsync(`/queues/${queue}/${files[i]}.job`) }
-    try {
-      await this.archive.rmdirAsync(`/queues/${queue}`)
-    } catch (error) {
-      if (error.toString().indexOf(`/queues/${queue} could not be found`) >= 0) { return }
-      throw error
+    let batch = []
+    for (let i in files) {
+      batch.push({
+        type: 'del',
+        key: `/queues/${queue}/${files[i]}.job`
+      })
     }
+
+    return this.database.batchAsync(batch)
   }
 
   sanitize (name) {
     name = String(name)
     name = name.toLowerCase()
     name = name.replace(/[^a-z0-9 ]/g, '_')
-    name = name.replace(/-/g, '_') // TODO: Why is "-" an invalid char?
+    name = name.replace(/\//g, '_')
+    name = name.replace(/-/g, '_') // for regular expression help (not a word boundry)
     return name
   }
 }

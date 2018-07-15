@@ -12,6 +12,7 @@ const hyperjob = new Hyperjob({
 })
 
 hyperjob.on('ready', (version) => { console.log(`Ready! (version: ${version})`) })
+hyperjob.on('connecting', () => { console.log(`connecting to swarm...`) })
 hyperjob.on('error', (error) => { console.error(`Error: ${error}`) })
 hyperjob.on('archiveKey', (key) => { console.log(`Archive Key: ${key}`) })
 hyperjob.on('peerConnect', (peer, type) => { console.log(`Peer Connected: ${type.host}:${type.port} (${type.type})`) })
@@ -21,26 +22,27 @@ async function main () {
   await hyperjob.connect()
 
   // add a job
-  await hyperjob.enqueue('low-priority', 'doSomeMath', {a: 1, b: 2})
+  await hyperjob.enqueue('low_priority', 'doSomeMath', {a: 1, b: 2})
 
   // see the queue
   let queues = await hyperjob.queues()
+  console.log(queues)
   console.log(`Queues: ${queues}`)
 
   // list enqueued jobs
   let jobs = await hyperjob.enqueued(queues[0])
   console.log(`Jobs: ${jobs}`)
 
-  // inspect the job
+  // // inspect the job
   let job = await hyperjob.get(queues[0], jobs[0])
   console.log(`Job: ${JSON.stringify(job)}`)
 
-  // delete the job
+  // // delete the job
   await hyperjob.del(queues[0], jobs[0])
   jobs = await hyperjob.enqueued(queues[0])
   console.log(`Jobs (after single delete): ${jobs}`)
 
-  // delete the queue
+  // // delete the queue
   await hyperjob.enqueue('low-priority', 'doSomeMath', {a: 1, b: 2})
   await hyperjob.delQueue(queues[0])
   jobs = await hyperjob.enqueued(queues[0])

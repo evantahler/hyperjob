@@ -10,8 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "hyperdb": "^3.3.0",
     "hyperdiscovery": "^8.0.0",
-    "hyperdrive": "^9.14.0",
     "uuid": "^3.3.2"
   },
   "devDependencies": {
