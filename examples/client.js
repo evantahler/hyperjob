@@ -33,16 +33,16 @@ async function main () {
   let jobs = await producer.enqueued(queues[0])
   console.log(`Jobs: ${jobs}`)
 
-  // // inspect the job
+  // inspect the job
   let job = await producer.get(queues[0], jobs[0])
   console.log(`Job: ${JSON.stringify(job)}`)
 
-  // // delete the job
+  // delete the job
   await producer.del(queues[0], jobs[0])
   jobs = await producer.enqueued(queues[0])
   console.log(`Jobs (after single delete): ${jobs}`)
 
-  // // delete the queue
+  // delete the queue
   await producer.enqueue('low-priority', 'doSomeMath', {a: 1, b: 2})
   await producer.delQueue(queues[0])
   jobs = await producer.enqueued(queues[0])
