@@ -1,4 +1,6 @@
 # Hyperjob
+[![CircleCI](https://circleci.com/gh/evantahler/hyperjob.svg?style=svg)](https://circleci.com/gh/evantahler/hyperjob)
+
 A distributed, file-based job queue cluster
  **VERY WIP** **DO NOT USE**
 
