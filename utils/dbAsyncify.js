@@ -53,5 +53,20 @@ module.exports = function dbAsyncify (db) {
     })
   }
 
+  db.moveAsync = async (from, to) => {
+    return new Promise(async (resolve, reject) => {
+      let batch = []
+      try {
+        const node = await db.getAsync(from)
+        batch.push({ type: 'del', key: from })
+        batch.push({ type: 'put', key: to, value: node.value })
+        const response = await db.batchAsync(batch)
+        return resolve(response)
+      } catch (error) {
+        return reject(error)
+      }
+    })
+  }
+
   return db
 }
