@@ -5,9 +5,21 @@ const Hyperjob = require(path.join('..', 'index.js'))
 
 const archiveKey = process.argv[2]
 
+const handlers = {
+  sayHello: async (args) => {
+    return new Promise((resolve) => {
+      console.log(`*** hello from ${args.name} @ ${args.time} ***`)
+      setTimeout(() => {
+        return resolve(true)
+      }, 1000)
+    })
+  }
+}
+
 const consumer = new Hyperjob.Consumer({
   archiveKey: archiveKey,
-  archivePath: `./test_data/consumer`
+  archivePath: `./test_data/consumer`,
+  handlers
 })
 
 consumer.on('ready', (version) => { console.log(`Ready! (version: ${version})`) })
@@ -19,8 +31,8 @@ consumer.on('peerDisconnect', (peer, type) => { console.log(`Peer Disconnected: 
 consumer.on('poll', () => { console.log(`polling for work`) })
 consumer.on('workQueues', (queues) => { console.log(`working ${queues} queues`) })
 consumer.on('job', (job) => { console.log(`working job: ${JSON.stringify(job)}`) })
-consumer.on('jobComplete', (job, result, delta) => { console.log(`Completed Job ${job.value.name} in ${delta / 1000}s with result: ${JSON.stringify(result)}`) })
-consumer.on('jobFailed', (job, error, delta) => { console.log(`Failed Job ${job.value.name} in ${delta / 1000}s with error: ${error}`) })
+consumer.on('jobComplete', (job, result, delta) => { console.log(`Completed Job ${job.name} in ${delta / 1000}s with result: ${JSON.stringify(result)}`) })
+consumer.on('jobFailed', (job, error, delta) => { console.log(`Failed Job ${job.name} in ${delta / 1000}s with error: ${error}`) })
 consumer.on('sleep', () => { console.log('sleeping...') })
 
 async function main () {
