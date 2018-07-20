@@ -1,4 +1,10 @@
 module.exports = function dbAsyncify (db) {
+  db.sleepAsync = async (time = 1000) => {
+    return new Promise((resolve) => {
+      setTimeout(() => resolve, time)
+    })
+  }
+
   db.versionAsync = async (path, contents) => {
     return new Promise((resolve, reject) => {
       db.version((error, version) => {
@@ -65,6 +71,39 @@ module.exports = function dbAsyncify (db) {
       } catch (error) {
         return reject(error)
       }
+    })
+  }
+
+  db.authorizeAsync = async (key) => {
+    return new Promise(async (resolve, reject) => {
+      db.authorize(key, (error, auth) => {
+        if (error) { return reject(error) }
+        return resolve(auth)
+      })
+    })
+  }
+
+  db.authorizedAsync = async (key) => {
+    return new Promise(async (resolve, reject) => {
+      db.authorized(key, (error, auth) => {
+        if (error) { return reject(error) }
+        return resolve(auth)
+      })
+    })
+  }
+
+  db.awaitAuthorizedAsync = async (remoteKey, thisAttempt = 0, maxAttempts = 10) => {
+    thisAttempt++
+    return new Promise(async (resolve, reject) => {
+      if (thisAttempt >= maxAttempts) {
+        return reject(new Error(`was not authroized after ${maxAttempts} attempts`))
+      }
+
+      let auth = await db.authorizedAsync(remoteKey)
+      if (auth) { return resolve(auth) }
+
+      await db.sleepAsync()
+      return db.awaitAuthorizedAsync(remoteKey, thisAttempt, maxAttempts)
     })
   }
 

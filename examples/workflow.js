@@ -13,8 +13,10 @@ const producer = new Hyperjob.Producer({
 
 producer.on('ready', (version) => { console.log(`Ready! (version: ${version})`) })
 producer.on('connecting', () => { console.log(`connecting to swarm...`) })
+producer.on('authorized', (auth) => { console.log(`authorized: ${auth}`) })
 producer.on('error', (error) => { console.error(`Error: ${error}`) })
 producer.on('archiveKey', (key) => { console.log(`Archive Key: ${key}`) })
+producer.on('localKey', (key) => { console.log(`Local Key: ${key}`) })
 producer.on('peerConnect', (peer, type) => { console.log(`Peer Connected: ${type.host}:${type.port} (${type.type})`) })
 producer.on('peerDisconnect', (peer, type) => { console.log(`Peer Disconnected: ${type.host}:${type.port} (${type.type})`) })
 

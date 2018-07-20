@@ -4,6 +4,9 @@ const path = require('path')
 const Hyperjob = require(path.join('..', 'index.js'))
 
 const archiveKey = process.argv[2]
+const authorizedKeys = process.env.AUTHORIZED_KEYS
+  ? process.env.AUTHORIZED_KEYS.split(',').map((k) => { return k.trim() })
+  : []
 
 const handlers = {
   sayHello: async (args) => {
@@ -19,13 +22,16 @@ const handlers = {
 const consumer = new Hyperjob.Consumer({
   archiveKey: archiveKey,
   archivePath: `./test_data/consumer`,
+  authorizedKeys,
   handlers
 })
 
 consumer.on('ready', (version) => { console.log(`Ready! (version: ${version})`) })
 consumer.on('connecting', () => { console.log(`connecting to swarm...`) })
+consumer.on('authorized', (auth) => { console.log(`authorized: ${auth}`) })
 consumer.on('error', (error) => { console.error(`Error: ${error}`) })
 consumer.on('archiveKey', (key) => { console.log(`Archive Key: ${key}`) })
+consumer.on('localKey', (key) => { console.log(`Local Key: ${key}`) })
 consumer.on('peerConnect', (peer, type) => { console.log(`Peer Connected: ${type.host}:${type.port} (${type.type})`) })
 consumer.on('peerDisconnect', (peer, type) => { console.log(`Peer Disconnected: ${type.host}:${type.port} (${type.type})`) })
 consumer.on('poll', () => { console.log(`polling for work`) })
